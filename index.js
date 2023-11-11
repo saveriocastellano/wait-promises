@@ -78,9 +78,6 @@ module.exports = new class extends EventEmitter {
         this._count ++;
         this.emit('await', this._promises.length+1);        
         this._session.post('Runtime.awaitPromise', {promiseObjectId: this._objectId}, this._awaitResult.bind(this));
-        if (this._options && Number.isInteger(this._options.promiseMaxSeconds)) setTimeout(()=>{
-
-        }, this._options.promiseMaxSeconds);
     }
 
     _awaitResult(err) {
