@@ -1,6 +1,6 @@
 {
   "name": "wait-promises",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "allows you to wait for all pending promises to complete before the NodeJS process exits",
   "main": "index.js",
   "scripts": {
