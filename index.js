@@ -19,16 +19,6 @@ module.exports = new class extends EventEmitter {
         this._session.post('Runtime.evaluate', {expression: 'Promise.prototype'}, this._gotPromisePrototype.bind(this));      
     }
 
-    _heartBeat() {
-        this._exit();
-        if (Number.isInteger(this._maxSeconds) && this._maxSeconds != -1 && (Date.now() - this._startedAt) > this._maxSeconds) {
-            this.emit('timeout');
-            this._exit();
-            return;
-        }
-        this.emit('heartbeat');
-    }
-
     _gotPromisePrototype(err, params) {
         if (err) return this._exit(err);
         this._objectId = params.result.objectId;
