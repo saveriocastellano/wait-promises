@@ -2,83 +2,86 @@
 const {EventEmitter} = require('events');
 const {Session} = require('inspector');
 
-
 module.exports = new class extends EventEmitter {
 
-    wait() {
-        process.once('beforeExit', this._start.bind(this));
-    }
-
-    _start() {
-        let self = this;
+    run() {
         this._session = new Session();
         this._session.connect();
-
-        this._heartBeatTimer = setInterval(()=>self.emit('heartbeat'), 100); 
-       
+        this._count = 0;
+        this._getPromises();
+    }
+        
+    _getPromises() {
         this._session.post('Runtime.evaluate', {expression: 'Promise.prototype'}, this._gotPromisePrototype.bind(this));      
     }
 
     _gotPromisePrototype(err, params) {
-        if (err) return this._exit(err);
+        if (err) return this._done(err);
         this._objectId = params.result.objectId;
-        this._session.post('Runtime.queryObjects', {prototypeObjectId: this._objectId}, this._getPromises.bind(this));
+        this._session.post('Runtime.queryObjects', {prototypeObjectId: this._objectId}, this._gotPromiseObjects.bind(this));
     }
 
     _releaseObjectAndContinue(nextCallback) {
         let self = this;
         this._session.post('Runtime.releaseObject', {objectId: this._objectId}, (err)=>{
-            if (err) return self._exit(err);
+            if (err) return self._done(err);
             nextCallback.call(self);
         });        
     }
         
-    _getPromises(err, params) {
+    _gotPromiseObjects(err, params) {
         this._releaseObjectAndContinue(()=>{
-            if (err) return this._exit(err);
+            if (err) return this._done(err);
             this._objectId = params.objects.objectId;
-            this._session.post('Runtime.getProperties', {objectId: this._objectId, ownProperties: true}, this._startLoop.bind(this));
+            this._session.post('Runtime.getProperties', {objectId: this._objectId, ownProperties: true}, this._gotPromises.bind(this));
         })
     }
 
-    _startLoop(err, params) {
+    _gotPromises(err, params) {
+
         this._releaseObjectAndContinue(()=>{
-            if (err) return this._exit(err);
-            this._promises = params.result.filter(prop=>!isNaN(parseInt(prop.name))).map(prop=>prop.value.objectId);
-            this._count = 0;
-            this._loop();
+            if (err) return this._done(err);
+            this._promises = params.result.filter(prop=>Number.isInteger(parseInt(prop.name))).map(prop=>prop.value.objectId);
+            this._anyPending = false;
+            this._getNextPromise();
         })        
     }
 
-    _loop() {
-        if (this._promises.length == 0) return this._exit();
-        this._objectId = this._promises.splice(0, 1)[0];
+    _getNextPromise() {
+        if (this._promises.length == 0) {
+            if (this._anyPending) {
+                return process.nextTick(this._getPromises.bind(this));
+            } else {
+                return this._done();
+            }
+        }
+        this._objectId = this._promises.shift();
         this._session.post('Runtime.getProperties', {objectId: this._objectId, ownProperties: true}, this._waitForPromise.bind(this));
     }
 
     _waitForPromise(err, params) {
-        if (err) return this._exit(err);
+        if (err) return this._done(err);
         let status = params.internalProperties.find(prop=>prop.name=='[[PromiseState]]').value;
         if (status.value != 'pending') {
             this._releaseObjectAndContinue(()=>{
-                this._loop();
+                this._getNextPromise();
             });
             return;
         }
         this._count ++;
-        this.emit('await', this._promises.length+1);        
+        this._anyPending = true;
+        this.emit('await', this._count);        
         this._session.post('Runtime.awaitPromise', {promiseObjectId: this._objectId}, this._awaitResult.bind(this));
     }
 
     _awaitResult(err) {
         this._releaseObjectAndContinue(()=>{
-            if (err) return this._exit(err);
-            this._loop();    
-        });
+            if (err) return this._done(err);
+            this._getNextPromise();    
+        });  
     }
 
-    _exit(err) {
-        clearInterval(this._heartBeatTimer);
+    _done(err) {
         this._session.disconnect();
         if (err) {
             this.emit('error', err);
@@ -87,4 +90,3 @@ module.exports = new class extends EventEmitter {
         }
     }
 }
-
