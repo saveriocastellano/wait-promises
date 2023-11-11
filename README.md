@@ -10,6 +10,9 @@ Follow the following steps:
 - listen to SIGINT and in the handler call run() method to check and wait for pending promises
 - listen to the 'done' event to know when all pending promises have completed and then call process.exit()
 
+wait-promises not only waits for all promises that are pending when SIGINT signal is received, it also waits for
+any other promise originating from them (see example below).
+
 # installation
 
 npm install wait-promises
@@ -45,3 +48,27 @@ Waiter.on('done', (num) => {console.log(`waited for ${num} promises`); process.e
  
 
 ```
+
+Executing the above test without sending SIGINT signal to the process (Control-c) gives the following output: 
+
+```
+sleeping 3000ms...
+slept!
+sleeping 3000ms...
+slept!
+all sleeps completed!
+```
+Executing the above test and immediately pressing Control-c to send SIGINT signal the the process gives the following output:
+
+```
+sleeping 3000ms...
+^Cwaiting for promise #1 
+slept!
+sleeping 3000ms...
+waiting for promise #2 
+slept!
+all sleeps completed!
+waited for 2 promises
+```
+
+
