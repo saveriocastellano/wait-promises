@@ -3,7 +3,7 @@ allows you to wait for all pending promises to complete before the NodeJS proces
 
 # installation
 
-npm i wait-promises
+npm install wait-promises
 
 # usage
 
