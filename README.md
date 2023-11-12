@@ -71,4 +71,10 @@ all sleeps completed!
 waited for 2 promises
 ```
 
+#donate!
+Is this project useful to you? If this is the case and if you really can't resist of sending me money
+you can use this [page](https://saveriocastellano.github.io/wait-promises/) to make a crypto donation to me, rest assured I will do something useful with it.
+
+
+
 
